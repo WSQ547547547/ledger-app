@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+
+/* 相对本文件 src/index.css；显式列出登录页，避免部分环境下 glob 漏扫 */
+@source "./App.tsx";
+@source "./main.tsx";
+@source "./components/LoginPanel.tsx";
+@source "./components/**/*.tsx";
+@source "./hooks/**/*.ts";
+@source "./lib/**/*.ts";
+@source "./utils/**/*.ts";
+@source "./styles/**/*.ts";
+
+html {
+  height: 100%;
+  min-height: 100dvh;
+}
+
+:root {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  /* 与 .home-art 手账底一致，切页时边缘不露灰 */
+  background-color: #ebe6dc;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/** 首页：纯色暖底（参考图底纸） */
+.home-art {
+  background-color: #ebe6dc;
+}
+
+/** 参考图：衬线体贯穿数字与中文 */
+.journal-serif {
+  font-family:
+    Georgia,
+    'Songti SC',
+    'Source Han Serif SC',
+    'Noto Serif SC',
+    'Iowan Old Style',
+    'Palatino Linotype',
+    serif;
+}
+
+/**
+ * 方格纸卡片：浅灰 1px 网格 + 小圆角 + 轻阴影
+ * 与参考图「卡片上细方格」一致
+ */
+.journal-grid-card {
+  background-color: rgb(252 250 247);
+  background-image:
+    linear-gradient(rgb(60 55 50 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(60 55 50 / 0.055) 1px, transparent 1px);
+  background-size: 10px 10px;
+  border-radius: 8px;
+  border: 1px solid rgb(60 55 50 / 0.06);
+  box-shadow: 0 3px 14px rgb(40 35 30 / 0.07);
+}
+
+/** 环形图外圈图例（引导线 + 文案）：渐显，避免与扇区动画同时「弹出」 */
+@keyframes pie-callout-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.pie-callout-fade {
+  opacity: 0;
+  animation: pie-callout-fade-in 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.app-main-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
