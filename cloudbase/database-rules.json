@@ -1,0 +1,14 @@
+{
+  "categories": {
+    "read": "doc.user_id == auth.uid",
+    "create": "auth.uid != null && request.data.user_id == auth.uid",
+    "update": "doc.user_id == auth.uid && request.data.user_id == auth.uid",
+    "delete": "doc.user_id == auth.uid"
+  },
+  "bills": {
+    "read": "doc.user_id == auth.uid",
+    "create": "auth.uid != null && request.data.user_id == auth.uid",
+    "update": "doc.user_id == auth.uid && request.data.user_id == auth.uid",
+    "delete": "doc.user_id == auth.uid"
+  }
+}

@@ -3,15 +3,32 @@ import { journalGridCard, journalInk, journalLabel, journalMuted, journalTerraco
 
 interface Props {
   onSignIn: (email: string, password: string) => Promise<{ error: { message: string } | null }>
-  onSignUp: (email: string, password: string) => Promise<{ error: { message: string } | null }>
+  onSignUp: (email: string, password: string, verificationCode: string) => Promise<{ error: { message: string } | null }>
+  onRequestSignUpCode: (email: string) => Promise<{ error: { message: string } | null }>
 }
 
-export function LoginPanel({ onSignIn, onSignUp }: Props) {
+export function LoginPanel({ onSignIn, onSignUp, onRequestSignUpCode }: Props) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
   const [busy, setBusy] = useState(false)
+  const [codeBusy, setCodeBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+
+  async function handleRequestCode() {
+    setMessage(null)
+    const em = email.trim()
+    if (!em) {
+      setMessage('请先填写邮箱')
+      return
+    }
+    setCodeBusy(true)
+    const { error } = await onRequestSignUpCode(em)
+    setCodeBusy(false)
+    if (error) setMessage(error.message)
+    else setMessage('验证码已发送，请查收邮件（含垃圾箱）')
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -21,12 +38,18 @@ export function LoginPanel({ onSignIn, onSignUp }: Props) {
       setMessage('请输入邮箱，且密码至少 6 位')
       return
     }
+    if (mode === 'signup' && verificationCode.trim().length < 4) {
+      setMessage('请输入邮箱验证码')
+      return
+    }
     setBusy(true)
-    const fn = mode === 'signin' ? onSignIn : onSignUp
-    const { error } = await fn(em, password)
+    const { error } =
+      mode === 'signin'
+        ? await onSignIn(em, password)
+        : await onSignUp(em, password, verificationCode.trim())
     setBusy(false)
     if (error) setMessage(error.message)
-    else if (mode === 'signup') setMessage('若项目开启了邮箱验证，请查收邮件后再登录。')
+    else if (mode === 'signup') setMessage('注册成功，已自动登录')
   }
 
   return (
@@ -45,7 +68,7 @@ export function LoginPanel({ onSignIn, onSignUp }: Props) {
             极简记账
           </h1>
           <p className={`mx-auto mt-2 max-w-[28ch] text-[14px] leading-relaxed ${journalMuted}`}>
-            使用邮箱登录以同步云端数据
+            使用邮箱登录，数据同步至腾讯云开发
           </p>
         </header>
 
@@ -103,6 +126,33 @@ export function LoginPanel({ onSignIn, onSignUp }: Props) {
               placeholder="you@example.com"
             />
           </div>
+          {mode === 'signup' ? (
+            <div>
+              <label className={`mb-2 block ${journalLabel}`} htmlFor="login-code">
+                邮箱验证码
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="login-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className={`h-12 min-w-0 flex-1 rounded-lg border border-[rgb(60_55_50/0.1)] bg-[rgb(252_250_247/0.95)] px-4 text-[16px] leading-none outline-none ring-0 transition-[box-shadow,background-color,border-color] duration-200 ease-out placeholder:text-[rgb(115_108_100/0.45)] focus:border-[#b8966a]/55 focus:bg-[rgb(255_254_252)] focus:shadow-[0_0_0_3px_rgb(184_150_106/0.22)] ${journalInk}`}
+                  placeholder="6 位验证码"
+                />
+                <button
+                  type="button"
+                  disabled={codeBusy}
+                  onClick={() => void handleRequestCode()}
+                  className="h-12 shrink-0 rounded-lg border border-[rgb(60_55_50/0.12)] bg-[rgb(252_250_247/0.95)] px-3 text-[14px] font-semibold text-[#3a3632] active:bg-[rgb(240_236_228/0.95)] disabled:opacity-50"
+                >
+                  {codeBusy ? '发送中…' : '获取验证码'}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div>
             <label className={`mb-2 block ${journalLabel}`} htmlFor="login-password">
               密码
@@ -122,7 +172,7 @@ export function LoginPanel({ onSignIn, onSignUp }: Props) {
             <p
               role="alert"
               className={`rounded-lg px-3 py-2.5 text-[13px] font-medium leading-snug ring-1 ${
-                message.includes('验证') || message.includes('查收')
+                message.includes('验证') || message.includes('查收') || message.includes('成功')
                   ? `${journalInk} bg-[rgb(245_242_237/0.9)] ring-[rgb(60_55_50/0.08)]`
                   : `${journalTerracotta} bg-[rgb(252_238_235/0.65)] ring-[rgb(168_93_82/0.2)]`
               }`}

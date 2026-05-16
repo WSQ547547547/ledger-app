@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -10,21 +13,21 @@
     "pwa:icons": "node scripts/pwa-icons-cli.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
+    "@cloudbase/js-sdk": "^2.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
-    "postcss": "^8.5.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "postcss": "^8.5.1",
+    "sharp": "^0.33.5",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.7.2",
     "vite": "^6.0.3",
-    "vite-plugin-pwa": "^1.0.0",
-    "sharp": "^0.33.5"
+    "vite-plugin-pwa": "^1.0.0"
   }
 }

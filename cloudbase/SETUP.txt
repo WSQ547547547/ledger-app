@@ -1,0 +1,44 @@
+CloudBase 迁移配置清单
+======================
+
+【项目进度快照 · 暂停运营前】
+  代码：已迁移 Supabase → CloudBase（@cloudbase/js-sdk），本地 build 通过
+  仓库：ledger-app，分支 master，远程 GitHub
+
+  控制台（你已完成 / 进行中）：
+  [x] 集合 categories、bills
+  [x] 权限 PRIVATE（读取和修改本人数据）
+  [x] 索引已配置
+  [ ] 发件邮箱（云开发邮件服务 或 自定义 SMTP）— 注册验证码必需
+  [ ] 身份认证：邮箱+密码、邮箱验证码
+  [ ] Web 应用 ClientId + 安全域名（localhost:5173、EdgeOne 域名）
+  [ ] 本地 .env 三项变量并 npm run dev 联调通过
+  [ ] EdgeOne 环境变量 + 重新部署
+
+  恢复运营时：从「三、身份认证」往下逐项打勾即可。
+
+---
+
+一、控制台创建集合（文档型数据库）
+  1. categories
+  2. bills
+
+二、为每个集合配置安全规则（数据库 → 集合 → 权限设置）
+  预设选「读取和修改本人数据 [PRIVATE]」即可（自带实例可能无自定义规则入口）
+  参考同目录 database-rules.json（高级环境可用）
+
+三、身份认证（Authentication 2.0）
+  1. 开启「邮箱 + 密码」登录
+  2. 开启邮箱验证码（注册必需）
+  3. 配置发件邮箱（云开发邮件服务 或 SMTP）
+  4. 在「安全配置」创建 Web 应用，复制 ClientId 到 .env 的 VITE_CLOUDBASE_CLIENT_ID
+  5. 将 EdgeOne / 本地 dev 域名加入「安全域名」白名单
+
+四、环境变量（.env 与 EdgeOne 构建环境）
+  VITE_CLOUDBASE_ENV_ID=
+  VITE_CLOUDBASE_CLIENT_ID=
+  VITE_CLOUDBASE_REGION=ap-shanghai
+
+五、从 Supabase 迁数据（可选）
+  在 Supabase SQL Editor 导出 bills / categories 后，
+  按 user_id 对应 CloudBase 新用户 uid 写入集合（需自行映射用户）。

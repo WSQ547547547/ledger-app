@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { getDb } from '../lib/cloudbase'
+import { fetchCategories, type CategoryDoc } from '../lib/ledgerDb'
 import type { CategoryChip, TxKind } from '../types'
 import { resolveCategoryIcon } from '../utils/categoryIcons'
 
 const defaultExpense = ['餐饮', '交通', '购物', '居住', '娱乐', '医疗', '充值'] as const
 const defaultIncome = ['工资', '奖金', '兼职', '理财', '礼金'] as const
-
-type DbRow = { id: string; name: string; kind: TxKind; icon: string | null }
 
 function mergeUnique(defaults: readonly string[], fromDb: string[]): string[] {
   const map = new Map<string, string>()
@@ -21,32 +20,26 @@ function mergeUnique(defaults: readonly string[], fromDb: string[]): string[] {
   return [...map.values()]
 }
 
+function dbErrorMessage(e: unknown): string {
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string') {
+    return (e as { message: string }).message
+  }
+  return '操作失败'
+}
+
 export function useCategoryOptions(userId: string | null) {
-  const [dbRows, setDbRows] = useState<DbRow[]>([])
+  const [dbRows, setDbRows] = useState<CategoryDoc[]>([])
 
   const reload = useCallback(async () => {
-    if (!supabase || !userId) {
+    if (!userId) {
       setDbRows([])
       return
     }
-    const { data, error } = await supabase
-      .from('categories')
-      .select('id, name, kind, icon')
-      .eq('user_id', userId)
-      .order('name', { ascending: true })
-
-    if (error) {
-      console.error(error)
-      return
+    try {
+      setDbRows(await fetchCategories(userId))
+    } catch (e) {
+      console.error(e)
     }
-
-    const rows: DbRow[] = (data ?? []).map((r) => ({
-      id: r.id,
-      name: r.name,
-      kind: r.kind as TxKind,
-      icon: r.icon,
-    }))
-    setDbRows(rows)
   }, [userId])
 
   useEffect(() => {
@@ -65,7 +58,7 @@ export function useCategoryOptions(userId: string | null) {
         return {
           name,
           icon: row?.icon?.trim() || resolveCategoryIcon(name),
-          categoryId: row?.id ?? null,
+          categoryId: row?._id ?? null,
         }
       })
     },
@@ -80,30 +73,32 @@ export function useCategoryOptions(userId: string | null) {
     ): Promise<{ ok: true } | { ok: false; message: string }> => {
       const n = name.trim()
       if (!n) return { ok: false, message: '请输入分类名称' }
-      if (!supabase || !userId) return { ok: false, message: '未登录' }
+      const db = getDb()
+      if (!db || !userId) return { ok: false, message: '未登录' }
 
       const ico = icon?.trim() || resolveCategoryIcon(n)
-
-      const { error } = await supabase.from('categories').insert({
-        user_id: userId,
-        name: n,
-        kind,
-        sort_order: 0,
-        icon: ico,
-      })
-
-      if (error) {
-        if (error.code === '23505') {
-          await reload()
-          return { ok: true }
-        }
-        return { ok: false, message: error.message }
+      const exists = dbRows.some((r) => r.kind === kind && r.name.trim().toLowerCase() === n.toLowerCase())
+      if (exists) {
+        await reload()
+        return { ok: true }
       }
 
-      await reload()
-      return { ok: true }
+      try {
+        await db.collection('categories').add({
+          user_id: userId,
+          name: n,
+          kind,
+          sort_order: 0,
+          icon: ico,
+          created_at: new Date().toISOString(),
+        })
+        await reload()
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, message: dbErrorMessage(e) }
+      }
     },
-    [userId, reload],
+    [userId, dbRows, reload],
   )
 
   const updateCategory = useCallback(
@@ -114,39 +109,38 @@ export function useCategoryOptions(userId: string | null) {
     ): Promise<{ ok: true } | { ok: false; message: string }> => {
       const n = name.trim()
       if (!n) return { ok: false, message: '请输入分类名称' }
-      if (!supabase || !userId) return { ok: false, message: '未登录' }
+      const db = getDb()
+      if (!db || !userId) return { ok: false, message: '未登录' }
+
+      const dup = dbRows.some(
+        (r) => r._id !== id && r.kind === dbRows.find((x) => x._id === id)?.kind && r.name.trim().toLowerCase() === n.toLowerCase(),
+      )
+      if (dup) return { ok: false, message: '已存在同名同类型分类' }
 
       const ico = icon?.trim() || resolveCategoryIcon(n)
-
-      const { error } = await supabase
-        .from('categories')
-        .update({ name: n, icon: ico })
-        .eq('id', id)
-        .eq('user_id', userId)
-
-      if (error) {
-        if (error.code === '23505') {
-          return { ok: false, message: '已存在同名同类型分类' }
-        }
-        return { ok: false, message: error.message }
+      try {
+        await db.collection('categories').doc(id).update({ name: n, icon: ico })
+        await reload()
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, message: dbErrorMessage(e) }
       }
-
-      await reload()
-      return { ok: true }
     },
-    [userId, reload],
+    [userId, dbRows, reload],
   )
 
   const deleteCategory = useCallback(
     async (id: string): Promise<{ ok: true } | { ok: false; message: string }> => {
-      if (!supabase || !userId) return { ok: false, message: '未登录' }
+      const db = getDb()
+      if (!db || !userId) return { ok: false, message: '未登录' }
 
-      const { error } = await supabase.from('categories').delete().eq('id', id).eq('user_id', userId)
-
-      if (error) return { ok: false, message: error.message }
-
-      await reload()
-      return { ok: true }
+      try {
+        await db.collection('categories').doc(id).remove()
+        await reload()
+        return { ok: true }
+      } catch (e) {
+        return { ok: false, message: dbErrorMessage(e) }
+      }
     },
     [userId, reload],
   )

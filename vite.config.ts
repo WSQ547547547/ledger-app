@@ -30,10 +30,10 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
+            urlPattern: /^https:\/\/.*\.(tcb-api|tcloudbaseapi)\.com\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'supabase-api',
+              cacheName: 'cloudbase-api',
               networkTimeoutSeconds: 10,
               expiration: {
                 maxEntries: 100,

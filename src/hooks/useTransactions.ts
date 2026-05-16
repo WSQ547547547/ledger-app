@@ -1,27 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchBills, fetchCategories, findOrCreateCategory, type BillDoc, type CategoryDoc } from '../lib/ledgerDb'
 import type { Transaction } from '../types'
 import { resolveCategoryIcon } from '../utils/categoryIcons'
+import { getDb } from '../lib/cloudbase'
 
-type BillRow = {
-  id: string
-  kind: 'income' | 'expense'
-  amount: number
-  note: string
-  occurred_on: string
-  categories: { name: string; icon: string | null } | null
-}
-
-function mapRow(row: BillRow): Transaction {
-  const name = row.categories?.name ?? '未分类'
+function mapBill(bill: BillDoc, categories: Map<string, CategoryDoc>): Transaction {
+  const cat = bill.category_id ? categories.get(bill.category_id) : undefined
+  const name = cat?.name ?? '未分类'
   return {
-    id: row.id,
-    kind: row.kind,
-    amount: Number(row.amount),
+    id: bill._id,
+    kind: bill.kind,
+    amount: Number(bill.amount),
     category: name,
-    categoryIcon: row.categories?.icon?.trim() || resolveCategoryIcon(name),
-    note: row.note ?? '',
-    date: row.occurred_on,
+    categoryIcon: cat?.icon?.trim() || resolveCategoryIcon(name),
+    note: bill.note ?? '',
+    date: bill.occurred_on,
   }
 }
 
@@ -30,27 +23,21 @@ export function useTransactions(userId: string | null) {
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async () => {
-    if (!supabase || !userId) {
+    if (!userId) {
       setItems([])
       return
     }
     setLoading(true)
-    const { data, error } = await supabase
-      .from('bills')
-      .select('id, kind, amount, note, occurred_on, categories ( name, icon )')
-      .eq('user_id', userId)
-      .order('occurred_on', { ascending: false })
-      .order('created_at', { ascending: false })
-
-    setLoading(false)
-
-    if (error) {
-      console.error(error)
+    try {
+      const [bills, categories] = await Promise.all([fetchBills(userId), fetchCategories(userId)])
+      const catMap = new Map(categories.map((c) => [c._id, c]))
+      setItems(bills.map((b) => mapBill(b, catMap)))
+    } catch (e) {
+      console.error(e)
       setItems([])
-      return
+    } finally {
+      setLoading(false)
     }
-
-    setItems(((data ?? []) as BillRow[]).map(mapRow))
   }, [userId])
 
   useEffect(() => {
@@ -59,49 +46,44 @@ export function useTransactions(userId: string | null) {
 
   const add = useCallback(
     async (t: Omit<Transaction, 'id'>) => {
-      if (!supabase || !userId) return
+      const db = getDb()
+      if (!db || !userId) return
+
       const displayName = t.category.trim() || '未分类'
       const icon = t.categoryIcon?.trim() || resolveCategoryIcon(displayName)
+      const categoryId = await findOrCreateCategory(userId, displayName, t.kind, icon)
+      if (!categoryId) return
 
-      const { data: catRow, error: catErr } = await supabase
-        .from('categories')
-        .upsert(
-          { user_id: userId, name: displayName, kind: t.kind, icon },
-          { onConflict: 'user_id,name,kind' },
-        )
-        .select('id')
-        .single()
-
-      if (catErr || !catRow) {
-        console.error(catErr)
-        return
+      const now = new Date().toISOString()
+      try {
+        await db.collection('bills').add({
+          user_id: userId,
+          category_id: categoryId,
+          kind: t.kind,
+          amount: t.amount,
+          note: t.note,
+          occurred_on: t.date,
+          created_at: now,
+          updated_at: now,
+        })
+        await refresh()
+      } catch (e) {
+        console.error(e)
       }
-
-      const { error: billErr } = await supabase.from('bills').insert({
-        user_id: userId,
-        category_id: catRow.id,
-        kind: t.kind,
-        amount: t.amount,
-        note: t.note,
-        occurred_on: t.date,
-      })
-
-      if (billErr) {
-        console.error(billErr)
-        return
-      }
-
-      await refresh()
     },
     [userId, refresh],
   )
 
   const remove = useCallback(
     async (id: string) => {
-      if (!supabase) return
-      const { error } = await supabase.from('bills').delete().eq('id', id)
-      if (error) console.error(error)
-      else await refresh()
+      const db = getDb()
+      if (!db) return
+      try {
+        await db.collection('bills').doc(id).remove()
+        await refresh()
+      } catch (e) {
+        console.error(e)
+      }
     },
     [refresh],
   )

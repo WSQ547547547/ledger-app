@@ -10,7 +10,7 @@ import { StatsTab } from './components/tabs/StatsTab'
 import { useCategoryOptions } from './hooks/useCategoryOptions'
 import { useAuth } from './hooks/useAuth'
 import { useTransactions } from './hooks/useTransactions'
-import { supabaseConfigured } from './lib/supabase'
+import { cloudbaseConfigured } from './lib/cloudbase'
 import type { TxKind } from './types'
 import { journalChrome } from './styles/homeJournal'
 import { currentCalendarYearKey, currentMonthKey, monthKeyFromDate, monthLabel, shiftMonth, yearKeyFromDate } from './utils/format'
@@ -23,7 +23,7 @@ const SCREEN_TITLE: Record<MainTab, string> = {
 }
 
 export default function App() {
-  const { session, user, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  const { user, loading: authLoading, signIn, signUp, signOut, requestSignUpCode } = useAuth()
   const uid = user?.id ?? null
   const { items, add, remove, loading: dataLoading, refresh } = useTransactions(uid)
   const categoryOpts = useCategoryOptions(uid)
@@ -93,17 +93,17 @@ export default function App() {
     return { income, expense, balance: income - expense }
   }, [items])
 
-  if (!supabaseConfigured) {
+  if (!cloudbaseConfigured) {
     return (
       <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${journalChrome}`}>
         <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10 text-center">
           <div className="journal-grid-card max-w-sm p-6">
-            <p className="text-[17px] font-semibold text-[#1f1d1b]">未配置 Supabase</p>
+            <p className="text-[17px] font-semibold text-[#1f1d1b]">未配置 CloudBase</p>
             <p className="mt-2 text-[14px] leading-relaxed text-[rgb(105_98_90/0.85)]">
               请在项目根目录创建 <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">.env</code>，写入{' '}
-              <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">VITE_SUPABASE_URL</code> 与{' '}
-              <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">VITE_SUPABASE_ANON_KEY</code>
-              （可在 Supabase 项目 Settings → API 中复制），保存后重新运行{' '}
+              <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">VITE_CLOUDBASE_ENV_ID</code> 与{' '}
+              <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">VITE_CLOUDBASE_CLIENT_ID</code>
+              （在腾讯云开发控制台 → 环境 → 安全配置 中获取），保存后重新运行{' '}
               <code className="rounded bg-[rgb(245_242_237/0.9)] px-1 ring-1 ring-[rgb(60_55_50/0.1)]">npm.cmd run dev</code>。
             </p>
           </div>
@@ -122,12 +122,13 @@ export default function App() {
     )
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${journalChrome}`}>
         <LoginPanel
           onSignIn={(email, password) => signIn(email, password)}
-          onSignUp={(email, password) => signUp(email, password)}
+          onSignUp={(email, password, code) => signUp(email, password, code)}
+          onRequestSignUpCode={(email) => requestSignUpCode(email)}
         />
       </div>
     )
